@@ -59,13 +59,13 @@ async function slackCall(method, token, body) {
 function messageSource(message) {
   const sender = [message.from?.first_name, message.from?.last_name]
     .filter(Boolean).join(' ') || message.sender_chat?.title || 'Unknown sender';
-  return `Telegram from: ${sender}\nSource: ${message.chat.title || 'Private chat'}`;
+  return `Msg From: ${sender}\nGroup Name: ${message.chat.title || 'Private chat'}`;
 }
 
 async function forwardText(message, env) {
   await slackCall('chat.postMessage', env.SLACK_BOT_TOKEN, {
     channel: env.SLACK_CHANNEL_ID,
-    text: `${messageSource(message)}\n\n${message.text}`,
+    text: `${messageSource(message)}\nCaption: ${message.text}`,
     mrkdwn: false,
     parse: 'none',
     unfurl_links: false,
@@ -113,12 +113,9 @@ async function forwardFile(message, attachment, env) {
   });
   if (!binary.ok) throw new Error(`Slack binary upload HTTP ${binary.status}`);
 
-  const sender = [message.from?.first_name, message.from?.last_name]
-    .filter(Boolean).join(' ') || message.sender_chat?.title || 'Unknown sender';
   const caption = (message.caption || '').slice(0, 1500);
   const comment = [
-    `Telegram file from: ${sender}`,
-    `Source: ${message.chat.title || 'Private chat'}`,
+    messageSource(message),
     caption ? `Caption: ${caption}` : null
   ].filter(Boolean).join('\n');
 
