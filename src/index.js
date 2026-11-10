@@ -59,7 +59,7 @@ async function slackCall(method, token, body) {
 function messageSource(message) {
   const sender = [message.from?.first_name, message.from?.last_name]
     .filter(Boolean).join(' ') || message.sender_chat?.title || 'Unknown sender';
-  return `From: ${sender} - ${message.chat.title || 'Private chat'}`;
+  return `From: ${sender} - (${message.chat.title || 'Private chat'})`;
 }
 
 async function forwardText(message, env) {
