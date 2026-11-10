@@ -10,7 +10,7 @@ test('picks largest Telegram photo', () => {
 });
 test('accepts PDF', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'pdf', mime_type: 'application/pdf', file_name: 'invoice.pdf' } }).fileId, 'pdf'));
 test('accepts image document', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'png', mime_type: 'image/png', file_name: 'scan.png' } }).fileId, 'png'));
-test('rejects mp3', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'audio', mime_type: 'audio/mpeg', file_name: 'song.mp3' } }), null));
+test('accepts audio documents', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'audio', mime_type: 'audio/mpeg', file_name: 'song.mp3' } }).filename, 'song.mp3'));
 
 const officeTypes = [
   ['xls', 'application/vnd.ms-excel'],
@@ -33,6 +33,6 @@ for (const [extension, mimeType] of officeTypes) {
     assert.equal(selectAttachment({ ...base, document: { file_id: 'office', mime_type: mimeType } }).fileId, 'office');
   });
 }
-test('rejects unrelated documents', () => {
-  assert.equal(selectAttachment({ ...base, document: { file_id: 'zip', file_name: 'archive.zip', mime_type: 'application/zip' } }), null);
+test('accepts arbitrary documents', () => {
+  assert.equal(selectAttachment({ ...base, document: { file_id: 'zip', file_name: 'archive.zip', mime_type: 'application/zip' } }).filename, 'archive.zip');
 });

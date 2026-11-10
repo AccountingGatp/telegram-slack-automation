@@ -1,5 +1,4 @@
 const MAX_BYTES = 20 * 1024 * 1024;
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 export function selectAttachment(message) {
   if (Array.isArray(message.photo) && message.photo.length) {
@@ -11,22 +10,34 @@ export function selectAttachment(message) {
       size: photo.file_size
     };
   }
-  const doc = message.document;
-  if (!doc) return null;
-  const filename = doc.file_name || `telegram-document-${message.message_id}`;
-  const mimeType = (doc.mime_type || '').toLowerCase();
-  const isPDF = mimeType === 'application/pdf' || /\.pdf$/i.test(filename);
-  const isImage = mimeType.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(filename);
-  const isExcel = /\.(xls|xlsx)$/i.test(filename) || [
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  ].includes(mimeType);
-  const isWord = /\.(doc|docx)$/i.test(filename) || [
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ].includes(mimeType);
-  if (!isPDF && !isImage && !isExcel && !isWord) return null;
-  return { fileId: doc.file_id, filename, mimeType: mimeType || 'application/octet-stream', size: doc.file_size };
+  const mediaTypes = [
+    ['document', '', 'application/octet-stream'],
+    ['voice', '.ogg', 'audio/ogg'],
+    ['audio', '.mp3', 'audio/mpeg'],
+    ['video', '.mp4', 'video/mp4'],
+    ['animation', '.mp4', 'video/mp4'],
+    ['video_note', '.mp4', 'video/mp4'],
+    ['sticker', '.webp', 'image/webp']
+  ];
+  for (const [kind, extension, defaultMimeType] of mediaTypes) {
+    const media = message[kind];
+    if (!media) continue;
+    let suffix = extension;
+    if (kind === 'sticker') {
+      suffix = media.is_video ? '.webm' : media.is_animated ? '.tgs' : '.webp';
+    } else if (kind === 'voice' && media.mime_type === 'audio/mpeg') {
+      suffix = '.mp3';
+    } else if (kind === 'voice' && media.mime_type === 'audio/mp4') {
+      suffix = '.m4a';
+    }
+    return {
+      fileId: media.file_id,
+      filename: media.file_name || `telegram-${kind}-${message.chat.id}-${message.message_id}${suffix}`,
+      mimeType: (media.mime_type || defaultMimeType).toLowerCase(),
+      size: media.file_size
+    };
+  }
+  return null;
 }
 
 async function slackCall(method, token, body) {
@@ -43,6 +54,23 @@ async function slackCall(method, token, body) {
   const data = await response.json();
   if (!data.ok) throw new Error(`Slack ${method}: ${data.error || 'unknown error'}`);
   return data;
+}
+
+function messageSource(message) {
+  const sender = [message.from?.first_name, message.from?.last_name]
+    .filter(Boolean).join(' ') || message.sender_chat?.title || 'Unknown sender';
+  return `Telegram from: ${sender}\nSource: ${message.chat.title || 'Private chat'}`;
+}
+
+async function forwardText(message, env) {
+  await slackCall('chat.postMessage', env.SLACK_BOT_TOKEN, {
+    channel: env.SLACK_CHANNEL_ID,
+    text: `${messageSource(message)}\n\n${message.text}`,
+    mrkdwn: false,
+    parse: 'none',
+    unfurl_links: false,
+    unfurl_media: false
+  });
 }
 
 async function forwardFile(message, attachment, env) {
@@ -124,8 +152,13 @@ export default {
         return new Response('Different chat ignored');
       }
       const attachment = selectAttachment(message);
-      if (!attachment) return new Response('Not a supported image, PDF, Excel or Word file');
-      await forwardFile(message, attachment, env);
+      if (attachment) {
+        await forwardFile(message, attachment, env);
+      } else if (typeof message.text === 'string' && message.text.length) {
+        await forwardText(message, env);
+      } else {
+        return new Response('Unsupported message type');
+      }
       return new Response('OK');
     } catch (error) {
       console.error('Forwarding error:', error instanceof Error ? error.message : 'Unknown error');
