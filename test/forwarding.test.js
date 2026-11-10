@@ -88,3 +88,56 @@ test('ignores service events', async (t) => {
   const response = await worker.fetch(request({ ...base, new_chat_members: [{ id: 2 }] }), env);
   assert.equal(await response.text(), 'Unsupported message type');
 });
+
+test('routes three allowed Telegram chats to the same Slack channel with their source names', async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return json({ ok: true });
+  });
+  const multipleEnv = { ...env, TELEGRAM_CHAT_ID: ' -42, -10043, -10044, ' };
+  for (const id of [-42, -10043, -10044]) {
+    const response = await worker.fetch(request({ ...base, chat: { id, title: 'Source ' + id }, text: 'Client message' }), multipleEnv);
+    assert.equal(response.status, 200);
+    assert.equal(await response.text(), 'OK');
+  }
+  assert.equal(calls.length, 3);
+  calls.forEach((call, index) => {
+    assert.equal(call.body.channel, env.SLACK_CHANNEL_ID);
+    assert.match(call.body.text, new RegExp('Source: Source ' + [-42, -10043, -10044][index]));
+  });
+  const ignored = await worker.fetch(request({ ...base, chat: { id: -1004 }, text: 'Other client' }), multipleEnv);
+  assert.equal(await ignored.text(), 'Different chat ignored');
+  assert.equal(calls.length, 3);
+});
+
+test('forwards a document channel_post from another allowed channel', async (t) => {
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes('/getFile?')) return json({ ok: true, result: { file_path: 'documents/statement' } });
+    if (url.includes('/file/bot')) return new Response(new Uint8Array([1, 2]));
+    if (url.endsWith('/files.getUploadURLExternal')) return json({ ok: true, upload_url: 'https://upload.test/file', file_id: 'F_TEST' });
+    if (url === 'https://upload.test/file') return new Response('OK');
+    if (url.endsWith('/files.completeUploadExternal')) return json({ ok: true });
+    throw new Error('Unexpected request: ' + url);
+  });
+  const channelPost = { ...base, chat: { id: -10044, title: 'Client documents' }, document: { file_id: 'doc', file_name: 'statement.pdf', file_size: 2 } };
+  const req = new Request('https://worker.test/telegram', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Telegram-Bot-Api-Secret-Token': env.WEBHOOK_SECRET },
+    body: JSON.stringify({ channel_post: channelPost })
+  });
+  const response = await worker.fetch(req, { ...env, TELEGRAM_CHAT_ID: '-42,-10043,-10044' });
+  assert.equal(await response.text(), 'OK');
+  const completion = JSON.parse(calls[4].options.body);
+  assert.equal(completion.channel_id, env.SLACK_CHANNEL_ID);
+  assert.equal(completion.files[0].title, 'statement.pdf');
+  assert.match(completion.initial_comment, /Source: Client documents/);
+});
+
+test('an empty comma list does not allow messages from every chat', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('Must not send'); });
+  const response = await worker.fetch(request({ ...base, text: 'Hello' }), { ...env, TELEGRAM_CHAT_ID: ' , , ' });
+  assert.equal(await response.text(), 'Different chat ignored');
+});

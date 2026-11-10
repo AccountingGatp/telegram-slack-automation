@@ -9,7 +9,7 @@ A small, webhook-driven Cloudflare Worker that sends Telegram **text messages, p
 - Node.js 20+ and a free Cloudflare account.
 - A Telegram bot token from [@BotFather](https://t.me/BotFather). The bot must be in your group and have group privacy disabled and be re-added, or be an administrator as appropriate.
 - A Slack app created at https://api.slack.com/apps with Bot Token Scopes **`files:write` and `chat:write`**, installed to your workspace. Invite the Slack bot to the destination channel via `/invite @YourBotName`.
-- Your desired Telegram chat ID and Slack channel ID.
+- Your desired Telegram chat IDs and Slack channel ID. Add the same Telegram bot to each source group/channel; for broadcast channels, add it as an administrator.
 
 This project defaults to no secrets. Never commit the real bot tokens, the Slack token, or your webhook secret to GitHub.
 
@@ -39,6 +39,20 @@ npx wrangler secret put WEBHOOK_SECRET
 For initial testing, the previously selected Slack channel was `#testing_msg` (`C0BT49GTZPT`) and the test Telegram group `test-2` was `-5276643267`. **Verify both IDs in your accounts before using them**. Use a long, random `WEBHOOK_SECRET` consisting only of letters, numbers, underscores and hyphens.
 
 Alternatively, configure the same values in Cloudflare Dashboard → Workers & Pages → your Worker → Settings → Variables and Secrets, using Secret for credentials.
+
+### Multiple Telegram groups/channels → one Slack channel
+
+Keep the same bot, webhook and Slack channel. In the production Worker's Settings → Variables and Secrets, edit the existing `TELEGRAM_CHAT_ID` value to contain all allowed numeric chat IDs separated by commas:
+
+```text
+-5276643267,-1001234567890,-1009876543210
+```
+
+These are examples; replace them with your actual IDs, including the minus signs. A single existing ID continues to work. Spaces around commas are accepted. Messages from chats not in this list are ignored. Add the same bot to every source group/channel and ensure it can receive messages (group privacy disabled or appropriate administrator permissions; channel bot added as administrator). Sender and source chat title appear with each forwarded message/file.
+
+Do not create a separate webhook per chat. Save/deploy the production variable change after deploying code that supports the list. Test a fresh text message and document from each chat.
+
+Dashboard variables are preserved by `keep_vars: true` in `wrangler.jsonc`. Store credentials as Secrets. This preserves existing values during subsequent deployments; it does not restore values already removed.
 
 ## 4. Register Telegram webhook
 
@@ -74,11 +88,11 @@ Switch from testing to production by updating `SLACK_CHANNEL_ID` and `TELEGRAM_C
 ## Details and limitations
 
 - A request to `GET /` responds with a basic health message; `POST /telegram` requires Telegram's webhook secret header.
-- Messages from other groups are ignored when `TELEGRAM_CHAT_ID` is set.
+- `TELEGRAM_CHAT_ID` accepts one numeric chat ID or a comma-separated allowlist. Other chats are ignored when it is set. Keep it configured in production; an unset value does not restrict source chats.
 - Standard Telegram Bot API downloads are limited to **20 MB** per file. Larger files are skipped. This is Telegram's hosted Bot API download limit; increasing the code's size constant does not bypass it. Supporting larger files requires a separately hosted Telegram Bot API server and corresponding changes to this Worker. File bytes are temporarily buffered in Worker memory.
 - Telegram retries webhook deliveries on HTTP 5xx responses; if an error occurs after a successful Slack upload, duplicates are possible. Production-grade deduplication can be added with Cloudflare KV/D1.
 - Free Cloudflare Workers limits include 100,000 requests/day, 10 ms CPU/request, 128 MB memory. Network waiting time doesn't count as CPU time, but actual runs must be tested against limits.
-- The Worker assumes trusted group membership and forwards text and all supported file/media attachments from the selected group. Review your organization's privacy and retention requirements.
+- The Worker assumes trusted group membership and forwards text and all supported file/media attachments from the selected groups/channels. Review your organization's privacy and retention requirements.
 - A Slack app with `files:write` and `chat:write` permissions is required. If upgrading an existing installation, add `chat:write` under OAuth & Permissions → Bot Token Scopes, reinstall the app to the workspace, and update the Cloudflare `SLACK_BOT_TOKEN` secret if Slack issues a new token. Missing `chat:write` causes text messages to fail with `missing_scope`. The legacy Slack `files.upload` API is **not** used.
 
 Official references: [Telegram Bot API](https://core.telegram.org/bots/api), [Slack upload API](https://docs.slack.dev/reference/methods/files.getUploadURLExternal/), [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
