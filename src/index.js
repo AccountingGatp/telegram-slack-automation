@@ -17,7 +17,15 @@ export function selectAttachment(message) {
   const mimeType = (doc.mime_type || '').toLowerCase();
   const isPDF = mimeType === 'application/pdf' || /\.pdf$/i.test(filename);
   const isImage = mimeType.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(filename);
-  if (!isPDF && !isImage) return null;
+  const isExcel = /\.(xls|xlsx)$/i.test(filename) || [
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  ].includes(mimeType);
+  const isWord = /\.(doc|docx)$/i.test(filename) || [
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ].includes(mimeType);
+  if (!isPDF && !isImage && !isExcel && !isWord) return null;
   return { fileId: doc.file_id, filename, mimeType: mimeType || 'application/octet-stream', size: doc.file_size };
 }
 
@@ -116,7 +124,7 @@ export default {
         return new Response('Different chat ignored');
       }
       const attachment = selectAttachment(message);
-      if (!attachment) return new Response('Not an image or PDF');
+      if (!attachment) return new Response('Not a supported image, PDF, Excel or Word file');
       await forwardFile(message, attachment, env);
       return new Response('OK');
     } catch (error) {

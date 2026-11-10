@@ -11,3 +11,28 @@ test('picks largest Telegram photo', () => {
 test('accepts PDF', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'pdf', mime_type: 'application/pdf', file_name: 'invoice.pdf' } }).fileId, 'pdf'));
 test('accepts image document', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'png', mime_type: 'image/png', file_name: 'scan.png' } }).fileId, 'png'));
 test('rejects mp3', () => assert.equal(selectAttachment({ ...base, document: { file_id: 'audio', mime_type: 'audio/mpeg', file_name: 'song.mp3' } }), null));
+
+const officeTypes = [
+  ['xls', 'application/vnd.ms-excel'],
+  ['xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  ['doc', 'application/msword'],
+  ['docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+];
+for (const [extension, mimeType] of officeTypes) {
+  test(`accepts ${extension} and preserves the filename`, () => {
+    const document = { file_id: 'office', file_name: `Client File.${extension}`, mime_type: mimeType };
+    assert.deepEqual(selectAttachment({ ...base, document }), {
+      fileId: 'office', filename: document.file_name, mimeType, size: undefined
+    });
+  });
+  test(`accepts uppercase ${extension} with a generic MIME type`, () => {
+    const document = { file_id: 'office', file_name: `Client.${extension.toUpperCase()}`, mime_type: 'application/octet-stream' };
+    assert.equal(selectAttachment({ ...base, document }).fileId, 'office');
+  });
+  test(`accepts ${extension} MIME type without a filename`, () => {
+    assert.equal(selectAttachment({ ...base, document: { file_id: 'office', mime_type: mimeType } }).fileId, 'office');
+  });
+}
+test('rejects unrelated documents', () => {
+  assert.equal(selectAttachment({ ...base, document: { file_id: 'zip', file_name: 'archive.zip', mime_type: 'application/zip' } }), null);
+});

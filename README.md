@@ -1,6 +1,6 @@
-# Telegram images and PDFs → Slack (Cloudflare Workers)
+# Telegram images, PDFs, Excel and Word files → Slack (Cloudflare Workers)
 
-A small, webhook-driven Cloudflare Worker that sends Telegram **photos and image/PDF documents** into a Slack channel. Plain text, audio, video and other documents are ignored. **No Zapier tasks or server to manage.**
+A small, webhook-driven Cloudflare Worker that sends Telegram **photos and image/PDF, Excel (.xls, .xlsx), and Word (.doc, .docx) documents** into a Slack channel. Plain text, audio, video and other documents are ignored. **No Zapier tasks or server to manage.**
 
 > Designed for small receipt files. Free-plan resource limits apply; production delivery and Slack permissions must be verified with real test messages.
 
@@ -66,7 +66,7 @@ The `setWebhook` response should include `ok: true`. `getWebhookInfo` should sho
 
 1. Send a fresh photo from another group member into the Telegram group.
 2. Verify the image itself arrives at Slack `#testing_msg`.
-3. Repeat with a PDF. A text-only message should **not** appear.
+3. Repeat with a PDF, an Excel workbook (.xls or .xlsx), and a Word document (.doc or .docx). Confirm each file arrives with its original filename and caption. A text-only message should **not** appear.
 4. See Cloudflare Workers → **Logs** for problems, and check Telegram's `getWebhookInfo.last_error_message` if Telegram cannot reach the webhook.
 
 Switch from testing to production by updating `SLACK_CHANNEL_ID` and `TELEGRAM_CHAT_ID` with `wrangler secret put` and checking the Slack bot has been invited to the production channel.
@@ -75,10 +75,10 @@ Switch from testing to production by updating `SLACK_CHANNEL_ID` and `TELEGRAM_C
 
 - A request to `GET /` responds with a basic health message; `POST /telegram` requires Telegram's webhook secret header.
 - Messages from other groups are ignored when `TELEGRAM_CHAT_ID` is set.
-- Standard Telegram Bot API downloads are limited to **20 MB** per file. Larger files are skipped. File bytes are temporarily buffered in Worker memory.
+- Standard Telegram Bot API downloads are limited to **20 MB** per file. Larger files are skipped. This is Telegram's hosted Bot API download limit; increasing the code's size constant does not bypass it. Supporting larger files requires a separately hosted Telegram Bot API server and corresponding changes to this Worker. File bytes are temporarily buffered in Worker memory.
 - Telegram retries webhook deliveries on HTTP 5xx responses; if an error occurs after a successful Slack upload, duplicates are possible. Production-grade deduplication can be added with Cloudflare KV/D1.
 - Free Cloudflare Workers limits include 100,000 requests/day, 10 ms CPU/request, 128 MB memory. Network waiting time doesn't count as CPU time, but actual runs must be tested against limits.
-- The Worker assumes trusted group membership and forwards all matching image/PDF attachments from the selected group. Review your organization's privacy and retention requirements.
+- The Worker assumes trusted group membership and forwards all matching image/PDF, Excel, and Word attachments from the selected group. Review your organization's privacy and retention requirements.
 - A Slack app with `files:write` permission is required. The legacy Slack `files.upload` API is **not** used.
 
 Official references: [Telegram Bot API](https://core.telegram.org/bots/api), [Slack upload API](https://docs.slack.dev/reference/methods/files.getUploadURLExternal/), [Cloudflare Workers limits](https://developers.cloudflare.com/workers/platform/limits/).
