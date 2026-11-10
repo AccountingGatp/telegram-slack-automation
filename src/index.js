@@ -59,13 +59,13 @@ async function slackCall(method, token, body) {
 function messageSource(message) {
   const sender = [message.from?.first_name, message.from?.last_name]
     .filter(Boolean).join(' ') || message.sender_chat?.title || 'Unknown sender';
-  return `Msg From: ${sender}\nGroup Name: ${message.chat.title || 'Private chat'}`;
+  return `Message From: ${sender}\nGroup: ${message.chat.title || 'Private chat'}`;
 }
 
 async function forwardText(message, env) {
   await slackCall('chat.postMessage', env.SLACK_BOT_TOKEN, {
     channel: env.SLACK_CHANNEL_ID,
-    text: `${messageSource(message)}\nCaption: ${message.text}`,
+    text: `${messageSource(message)}\n- ${message.text}`,
     mrkdwn: false,
     parse: 'none',
     unfurl_links: false,
@@ -116,7 +116,7 @@ async function forwardFile(message, attachment, env) {
   const caption = (message.caption || '').slice(0, 1500);
   const comment = [
     messageSource(message),
-    caption ? `Caption: ${caption}` : null
+    caption ? `- ${caption}` : null
   ].filter(Boolean).join('\n');
 
   await slackCall('files.completeUploadExternal', env.SLACK_BOT_TOKEN, {

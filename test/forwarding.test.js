@@ -28,7 +28,7 @@ test('forwards complete text with sender and source as plain text', async (t) =>
   assert.equal(response.status, 200);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://slack.com/api/chat.postMessage');
-  assert.equal(calls[0].body.text, 'Msg From: Client\nGroup Name: Client group\nCaption: ' + text);
+  assert.equal(calls[0].body.text, 'Message From: Client\nGroup: Client group\n- ' + text);
   assert.equal(calls[0].body.channel, 'C_TEST');
   assert.equal(calls[0].body.mrkdwn, false);
   assert.equal(calls[0].body.unfurl_links, false);
@@ -67,7 +67,7 @@ for (const [kind, media, filename] of [
     const completion = JSON.parse(calls[4].options.body);
     assert.equal(completion.channel_id, env.SLACK_CHANNEL_ID);
     assert.equal(completion.files[0].title, filename);
-    assert.equal(completion.initial_comment, 'Msg From: Client\nGroup Name: Client group\nCaption: Client caption');
+    assert.equal(completion.initial_comment, 'Message From: Client\nGroup: Client group\n- Client caption');
   });
 }
 
@@ -104,7 +104,7 @@ test('routes three allowed Telegram chats to the same Slack channel with their s
   assert.equal(calls.length, 3);
   calls.forEach((call, index) => {
     assert.equal(call.body.channel, env.SLACK_CHANNEL_ID);
-    assert.match(call.body.text, new RegExp('Group Name: Source ' + [-42, -10043, -10044][index]));
+    assert.match(call.body.text, new RegExp('Group: Source ' + [-42, -10043, -10044][index]));
   });
   const ignored = await worker.fetch(request({ ...base, chat: { id: -1004 }, text: 'Other client' }), multipleEnv);
   assert.equal(await ignored.text(), 'Different chat ignored');
@@ -133,7 +133,7 @@ test('forwards a document channel_post from another allowed channel', async (t) 
   const completion = JSON.parse(calls[4].options.body);
   assert.equal(completion.channel_id, env.SLACK_CHANNEL_ID);
   assert.equal(completion.files[0].title, 'statement.pdf');
-  assert.match(completion.initial_comment, /Group Name: Client documents/);
+  assert.match(completion.initial_comment, /Group: Client documents/);
 });
 
 test('an empty comma list does not allow messages from every chat', async (t) => {
