@@ -148,7 +148,9 @@ export default {
       const update = await request.json();
       const message = update.message || update.channel_post;
       if (!message?.chat) return new Response('Ignored');
-      if (env.TELEGRAM_CHAT_ID && String(message.chat.id) !== String(env.TELEGRAM_CHAT_ID)) {
+      const allowedChatIds = String(env.TELEGRAM_CHAT_ID || '')
+        .split(',').map((id) => id.trim()).filter(Boolean);
+      if (env.TELEGRAM_CHAT_ID && !allowedChatIds.includes(String(message.chat.id))) {
         return new Response('Different chat ignored');
       }
       const attachment = selectAttachment(message);
