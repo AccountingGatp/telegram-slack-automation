@@ -28,7 +28,7 @@ test('forwards complete text with sender and source as plain text', async (t) =>
   assert.equal(response.status, 200);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://slack.com/api/chat.postMessage');
-  assert.equal(calls[0].body.text, 'Telegram Msg From: Client\nGroup Name: Client group\nCaption: ' + text);
+  assert.equal(calls[0].body.text, 'Msg From: Client\nGroup Name: Client group\nCaption: ' + text);
   assert.equal(calls[0].body.channel, 'C_TEST');
   assert.equal(calls[0].body.mrkdwn, false);
   assert.equal(calls[0].body.unfurl_links, false);
@@ -67,7 +67,7 @@ for (const [kind, media, filename] of [
     const completion = JSON.parse(calls[4].options.body);
     assert.equal(completion.channel_id, env.SLACK_CHANNEL_ID);
     assert.equal(completion.files[0].title, filename);
-    assert.equal(completion.initial_comment, 'Telegram Msg From: Client\nGroup Name: Client group\nCaption: Client caption');
+    assert.equal(completion.initial_comment, 'Msg From: Client\nGroup Name: Client group\nCaption: Client caption');
   });
 }
 
